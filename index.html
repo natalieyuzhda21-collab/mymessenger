@@ -80,7 +80,9 @@
 
         function register() {
             const name = document.getElementById("regName").value.trim();
-            if (name) initNetwork(name);
+            if (name !== "") {
+                initNetwork(name);
+            }
         }
 
         function searchUser() {
