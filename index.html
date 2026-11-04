@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Мини-Чат</title>
-    <!-- Привязываем паспорт приложения для вывода на главный экран смартфона -->
+    <title>Pulshen</title>
     <link rel="manifest" href="manifest.json">
     <style>
         body { background: #0d0b14; color: #e0aaff; font-family: sans-serif; padding: 20px; margin: 0; height: 100vh; display: flex; flex-direction: column; }
@@ -14,7 +13,7 @@
         .msg { background: #241942; padding: 10px; margin: 5px 0; border-radius: 12px; max-width: 80%; word-wrap: break-word; }
         .my-msg { background: #9d4edd; margin-left: auto; color: white; box-shadow: 0 0 10px rgba(157, 78, 221, 0.4); }
     </style>
-    <!-- Подключаем надежный и открытый сетевой движок, который работает везде в РФ -->
+    <!-- Сетевой движок, работающий по всему миру без твоего сервера -->
     <script src="https://cloudflare.com"></script>
 </head>
 <body>
@@ -26,9 +25,8 @@
         <button onclick="register()">Войти</button>
     </div>
 
-    <!-- 2. ГЛАВНЫЙ ИНТЕРФЕЙС МЕССЕНДЖЕРА -->
+    <!-- 2. ИНТЕРФЕЙС МЕССЕНДЖЕРА -->
     <div id="appContainer" style="display: none; gap: 20px; height: 90vh;">
-        <!-- Левая панель: поиск -->
         <div style="width: 30%; border-right: 1px solid #3c2a6b; padding-right: 20px; display: flex; flex-direction: column;">
             <div style="display: flex; gap: 5px;">
                 <input type="text" id="searchName" placeholder="🔍 Найти ник..." style="width: 60%;">
@@ -37,7 +35,6 @@
             <div id="chatList" style="margin-top: 20px; cursor: pointer; font-weight: bold; color: #fff;"></div>
         </div>
 
-        <!-- Правая панель: окно чата -->
         <div style="width: 70%; display: flex; flex-direction: column; height: 100%;">
             <h3 id="chatHeader">Выберите, кому написать...</h3>
             <div id="msgBox" style="flex-grow: 1; overflow-y: auto; border: 1px solid #3c2a6b; padding: 15px; margin-bottom: 10px; border-radius: 8px; display: flex; flex-direction: column; gap: 8px;"></div>
@@ -51,10 +48,9 @@
     <script>
         let myName = "", activeChatWith = "", pubnub;
 
-        // Инициализация сети
         function initNetwork(username) {
-            myName = username;
-            localStorage.setItem("saved_username", myName); // Запоминаем в память браузера
+            myName = username.toLowerCase();
+            localStorage.setItem("saved_username", myName);
 
             pubnub = new PubNub({
                 publishKey: 'pub-c-4b9ef4be-2169-42b7-8db5-f855e902b4d1',
@@ -62,35 +58,28 @@
                 userId: myName
             });
 
-            // Слушаем входящие СМС из глобального облака
             pubnub.addListener({
                 message: function(event) {
                     const msg = event.message;
-                    // Показываем СМС только если оно касается нашего активного чата
                     if (msg.to === myName && msg.from === activeChatWith) {
                         renderMessage(msg.from, msg.text);
                     }
                 }
             });
 
-            // Подписываемся на свой личный канал для приема сообщений
             pubnub.subscribe({ channels: [myName] });
 
-            // Переключаем экраны
             document.getElementById("authScreen").style.display = "none";
             document.getElementById("appContainer").style.display = "flex";
         }
 
-        // Авто-вход при перезагрузке страницы (F5)
         window.onload = function() {
             const savedName = localStorage.getItem("saved_username");
-            if (savedName) {
-                initNetwork(savedName);
-            }
+            if (savedName) initNetwork(savedName);
         };
 
         function register() {
-            const name = document.getElementById("regName").value.trim().toLowerCase();
+            const name = document.getElementById("regName").value.trim();
             if (name) initNetwork(name);
         }
 
@@ -113,7 +102,7 @@
             item.onclick = function() {
                 activeChatWith = username;
                 document.getElementById("chatHeader").innerText = `Чат с @${username}`;
-                document.getElementById("msgBox").innerHTML = ""; // Чистим экран
+                document.getElementById("msgBox").innerHTML = "";
             };
             list.appendChild(item);
         }
@@ -122,12 +111,10 @@
             const input = document.getElementById("msgInput");
             const text = input.value.trim();
             if (text && activeChatWith) {
-                // Публикуем сообщение напрямую в персональный канал собеседника
                 pubnub.publish({
                     channel: activeChatWith,
                     message: { from: myName, to: activeChatWith, text: text }
                 });
-                // Сразу отображаем свое СМС у себя на экране
                 renderMessage(myName, text);
                 input.value = "";
             }
