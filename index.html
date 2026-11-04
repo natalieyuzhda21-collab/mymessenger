@@ -1,106 +1,99 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pulshen</title>
     <link rel="manifest" href="manifest.json">
     <style>
-        body { background: #0d0b14; color: #e0aaff; font-family: sans-serif; padding: 20px; margin: 0; height: 100vh; display: flex; flex-direction: column; }
-        input { background: #1a152e; border: 1px solid #3c2a6b; color: white; padding: 10px; border-radius: 5px; font-size: 1rem; }
+        /* Твой фирменный фиолетовый аскетичный стиль */
+        body { background: #0d0b14; color: #e0aaff; font-family: sans-serif; padding: 20px; margin: 0; }
+        input { background: #1a152e; border: 1px solid #3c2a6b; color: white; padding: 10px; border-radius: 5px; }
         button { background: #9d4edd; border: none; color: white; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        button:hover { background: #7b2cbf; }
-        .msg { background: #241942; padding: 10px; margin: 5px 0; border-radius: 12px; max-width: 80%; word-wrap: break-word; }
-        .my-msg { background: #9d4edd; margin-left: auto; color: white; box-shadow: 0 0 10px rgba(157, 78, 221, 0.4); }
+        .msg { background: #241942; padding: 8px; margin: 5px 0; border-radius: 8px; max-width: 80%; }
+        .my-msg { background: #9d4edd; margin-left: auto; color: white; }
     </style>
-    <!-- Сетевой движок, работающий по всему миру без твоего сервера -->
-    <script src="https://cloudflare.com"></script>
 </head>
 <body>
 
-    <!-- 1. ЭКРАН ВХОДА -->
-    <div id="authScreen" style="text-align: center; margin-top: 15vh;">
-        <h2>Регистрация аккаунта</h2>
+    <!-- 1. ОКНО ВХОДА -->
+    <div id="authScreen" style="text-align: center; margin-top: 100px;">
+        <h2>Регистрация Pulshen</h2>
         <input type="text" id="regName" placeholder="Придумай уникальный ник...">
         <button onclick="register()">Войти</button>
     </div>
 
-    <!-- 2. ИНТЕРФЕЙС МЕССЕНДЖЕРА -->
-    <div id="appContainer" style="display: none; gap: 20px; height: 90vh;">
-        <div style="width: 30%; border-right: 1px solid #3c2a6b; padding-right: 20px; display: flex; flex-direction: column;">
-            <div style="display: flex; gap: 5px;">
-                <input type="text" id="searchName" placeholder="🔍 Найти ник..." style="width: 60%;">
-                <button onclick="searchUser()">Найти пользователя</button>
-            </div>
-            <div id="chatList" style="margin-top: 20px; cursor: pointer; font-weight: bold; color: #fff;"></div>
+    <!-- 2. ГЛАВНЫЙ ЭКРАН МЕССЕНДЖЕРА -->
+    <div id="appContainer" style="display: none; gap: 20px;">
+        <!-- Панель слева: поиск -->
+        <div style="width: 30%; border-right: 1px solid #3c2a6b; padding-right: 20px;">
+            <input type="text" id="searchName" placeholder="🔍 Найти ник..." style="width: 50%;">
+            <button onclick="searchUser()">Найти пользователя</button>
+            <div id="chatList" style="margin-top: 20px; cursor: pointer; font-weight: bold;"></div>
         </div>
 
-        <div style="width: 70%; display: flex; flex-direction: column; height: 100%;">
+        <!-- Панель справа: чат -->
+        <div style="width: 70%; display: flex; flex-direction: column; height: 80vh;">
             <h3 id="chatHeader">Выберите, кому написать...</h3>
-            <div id="msgBox" style="flex-grow: 1; overflow-y: auto; border: 1px solid #3c2a6b; padding: 15px; margin-bottom: 10px; border-radius: 8px; display: flex; flex-direction: column; gap: 8px;"></div>
-            <div style="display: flex; gap: 10px;">
-                <input type="text" id="msgInput" placeholder="Сообщение (макс 300 симв)..." maxlength="300" style="width: 85%;">
-                <button onclick="sendMsg()" style="width: 15%;">Послать</button>
+            <div id="msgBox" style="flex-grow: 1; overflow-y: auto; border: 1px solid #3c2a6b; padding: 10px; margin-bottom: 10px;"></div>
+            <div>
+                <input type="text" id="msgInput" placeholder="Сообщение (макс 300 симв)..." maxlength="300" style="width: 80%;">
+                <button onclick="sendMsg()">Послать</button>
             </div>
         </div>
     </div>
 
     <script>
-        let myName = "", activeChatWith = "", pubnub;
+        // Использоватьlocalhost напрямую нельзя, но "localhost" вместо цифр решает проблему блокировки Гитхаба!
+        const ws = new WebSocket("ws://localhost:8000/ws");
+        let myName = "", activeChatWith = "";
 
-        function initNetwork(username) {
-            myName = username.toLowerCase();
-            localStorage.setItem("saved_username", myName);
-
-            pubnub = new PubNub({
-                publishKey: 'pub-c-4b9ef4be-2169-42b7-8db5-f855e902b4d1',
-                subscribeKey: 'sub-c-cb767664-df8b-49ea-994c-85fe97bfcb3c',
-                userId: myName
-            });
-
-            pubnub.addListener({
-                message: function(event) {
-                    const msg = event.message;
-                    if (msg.to === myName && msg.from === activeChatWith) {
-                        renderMessage(msg.from, msg.text);
-                    }
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (data.type === "error") alert(data.message);
+            
+            if (data.type === "auth_ok") {
+                myName = data.username;
+                localStorage.setItem("saved_username", myName); // Сохраняем в память
+                document.getElementById("authScreen").style.display = "none";
+                document.getElementById("appContainer").style.display = "flex";
+            }
+            if (data.type === "search_result") {
+                if (data.found) addChatToList(data.username);
+                else alert("Пользователь оффлайн или не существует!");
+            }
+            if (data.type === "msg") {
+                if (data.from === activeChatWith || (data.from === myName && activeChatWith !== "")) {
+                    const div = document.createElement("div");
+                    div.className = "msg" + (data.from === myName ? " my-msg" : "");
+                    div.innerText = `${data.from}: ${data.text}`;
+                    document.getElementById("msgBox").appendChild(div);
                 }
-            });
+            }
+        };
 
-            pubnub.subscribe({ channels: [myName] });
-
-            document.getElementById("authScreen").style.display = "none";
-            document.getElementById("appContainer").style.display = "flex";
-        }
-
-        window.onload = function() {
+        ws.onopen = function() {
             const savedName = localStorage.getItem("saved_username");
-            if (savedName) initNetwork(savedName);
+            if (savedName) {
+                ws.send(JSON.stringify({ action: "register", username: savedName }));
+            }
         };
 
         function register() {
             const name = document.getElementById("regName").value.trim();
-            if (name !== "") {
-                initNetwork(name);
-            }
+            if (name) ws.send(JSON.stringify({ action: "register", username: name }));
         }
-
         function searchUser() {
-            const name = document.getElementById("searchName").value.trim().toLowerCase();
+            const name = document.getElementById("searchName").value.trim();
             if (name === myName) return alert("Нельзя искать себя!");
-            if (name) addChatToList(name);
+            if (name) ws.send(JSON.stringify({ action: "search", username: name }));
         }
 
         function addChatToList(username) {
             const list = document.getElementById("chatList");
             if (document.getElementById(`chat-${username}`)) return;
-
             const item = document.createElement("div");
             item.id = `chat-${username}`;
             item.innerText = `@${username}`;
-            item.style.padding = "10px";
-            item.style.borderBottom = "1px solid #1f163a";
-            
             item.onclick = function() {
                 activeChatWith = username;
                 document.getElementById("chatHeader").innerText = `Чат с @${username}`;
@@ -111,26 +104,11 @@
 
         function sendMsg() {
             const input = document.getElementById("msgInput");
-            const text = input.value.trim();
-            if (text && activeChatWith) {
-                pubnub.publish({
-                    channel: activeChatWith,
-                    message: { from: myName, to: activeChatWith, text: text }
-                });
-                renderMessage(myName, text);
+            if (input.value.trim() && activeChatWith) {
+                ws.send(JSON.stringify({ action: "message", to: activeChatWith, text: input.value.trim() }));
                 input.value = "";
             }
         }
-
-        function renderMessage(sender, text) {
-            const div = document.createElement("div");
-            div.className = "msg" + (sender === myName ? " my-msg" : "");
-            div.innerText = `${sender}: ${text}`;
-            document.getElementById("msgBox").appendChild(div);
-            document.getElementById("msgBox").scrollTop = document.getElementById("msgBox").scrollHeight;
-        }
-
-        document.getElementById("msgInput").addEventListener('keypress', (e) => { if(e.key === 'Enter') sendMsg(); });
     </script>
 </body>
 </html>
